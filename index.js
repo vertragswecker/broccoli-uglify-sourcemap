@@ -1,29 +1,29 @@
 'use strict';
 
-const walkSync = require('walk-sync');
-const Plugin = require('broccoli-plugin');
-const path = require('path');
-const defaults = require('lodash.defaultsdeep');
-const symlinkOrCopy = require('symlink-or-copy');
-const mkdirp = require('mkdirp');
-const MatcherCollection = require('matcher-collection');
-const debug = require('debug')('broccoli-uglify-sourcemap');
-const queue = require('async-promise-queue');
-const workerpool = require('workerpool');
+var walkSync = require('walk-sync');
+var Plugin = require('broccoli-plugin');
+var path = require('path');
+var defaults = require('lodash.defaultsdeep');
+var symlinkOrCopy = require('symlink-or-copy');
+var mkdirp = require('mkdirp');
+var MatcherCollection = require('matcher-collection');
+var debug = require('debug')('broccoli-uglify-sourcemap');
+var queue = require('async-promise-queue');
+var workerpool = require('workerpool');
 
-const processFile = require('./lib/process-file');
+var processFile = require('./lib/process-file');
 
 module.exports = UglifyWriter;
 
 UglifyWriter.prototype = Object.create(Plugin.prototype);
 UglifyWriter.prototype.constructor = UglifyWriter;
 
-const silent = process.argv.indexOf('--silent') !== -1;
+var silent = process.argv.indexOf('--silent') !== -1;
 
-const worker = queue.async.asyncify(doWork => doWork());
+var worker = queue.async.asyncify(function(doWork) { doWork() });
 
-const MatchNothing = {
-  match() {
+var MatchNothing = {
+  match: function() {
     return false;
   },
 };
@@ -52,7 +52,7 @@ function UglifyWriter(inputNodes, options) {
 
   this.inputNodes = inputNodes;
 
-  let exclude = this.options.exclude;
+  var exclude = this.options.exclude;
   if (Array.isArray(exclude)) {
     this.excludes = new MatcherCollection(exclude);
   } else {
@@ -61,24 +61,24 @@ function UglifyWriter(inputNodes, options) {
 }
 
 UglifyWriter.prototype.build = function() {
-  let writer = this;
+  var writer = this;
 
-  // when options.async === true, allow processFile() operations to complete asynchronously
-  let pendingWork = [];
+  // when options.async === true, allow processFile() operations to compvare asynchronously
+  var pendingWork = [];
 
-  this.inputPaths.forEach(inputPath => {
-    walkSync(inputPath).forEach(relativePath => {
+  this.inputPaths.forEach(function(inputPath) {
+    walkSync(inputPath).forEach(function(relativePath) {
       if (relativePath.slice(-1) === '/') {
         return;
       }
-      let inFile = path.join(inputPath, relativePath);
-      let outFile = path.join(writer.outputPath, relativePath);
+      var inFile = path.join(inputPath, relativePath);
+      var outFile = path.join(writer.outputPath, relativePath);
 
       mkdirp.sync(path.dirname(outFile));
 
       if (relativePath.slice(-3) === '.js' && !writer.excludes.match(relativePath)) {
         // wrap this in a function so it doesn't actually run yet, and can be throttled
-        let uglifyOperation = function() {
+        var uglifyOperation = function() {
           return writer.processFile(inFile, outFile, relativePath, writer.outputPath);
         };
         if (writer.async) {
@@ -87,7 +87,7 @@ UglifyWriter.prototype.build = function() {
         }
         return uglifyOperation();
       } else if (relativePath.slice(-4) === '.map') {
-        if (writer.excludes.match(`${relativePath.slice(0, -4)}.js`)) {
+        if (writer.excludes.match(relativePath.slice(0, -4) + ".js")) {
           // ensure .map files for excluded JS paths are also copied forward
           symlinkOrCopy.sync(inFile, outFile);
         }
@@ -99,12 +99,12 @@ UglifyWriter.prototype.build = function() {
   });
 
   return queue(worker, pendingWork, writer.concurrency)
-    .then((/* results */) => {
+    .then(function(/* results */) {
       // files are finished processing, shut down the workers
       writer.pool.terminate();
       return writer.outputPath;
     })
-    .catch(e => {
+    .catch(function(e) {
       // make sure to shut down the workers on error
       writer.pool.terminate();
       throw e;
